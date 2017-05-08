@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from cosc343world import Creature, World
 import numpy as np
+import random
 import time
 
 # You can change this number to specify how many generations creatures are going to evolve over...
@@ -11,7 +12,7 @@ numTurns = 100
 
 # You can change this number to change the percept format.  You have three choice - format 1, 2 and 3 (described in
 # the assignment 2 pdf document)
-perceptFormat=2
+perceptFormat=1
 
 # You can change this number to chnage the world size
 gridSize=24
@@ -32,15 +33,43 @@ class MyCreature(Creature):
     # Input: numPercepts - the size of percepts list that creature will receive in each turn
     #        numActions - the size of actions list that creature must create on each turn
     def __init__(self, numPercepts, numActions):
-
         # Place your initialisation code here.  Ideally this should set up the creature's chromosome
         # and set it to some random state.
 
+        # Generate the monster part of the chromosome.
+        monster = [None] * int(3)
+        monster_state = [0, 1]
+        for i in range(len(monster)):
+            monster[i] = random.choice(monster_state)
+        self.monster = monster
+
+        # Generate the creature part of the chromosome.
+        creature = [None] * int(3)
+        creature_state = [0, 1]
+        for i in range(len(creature)):
+            creature[i] = random.choice(creature_state)
+        self.creature = creature
+
+        # Generate the food part of the chromosome.
+        food = [None] * int(3)
+        food_state = [0, 1, 2]
+        for i in range(len(food)):
+            food[i] = random.choice(food_state)
+        self.food = food
+
+        # Generate cross over intercept probabilities.
+        self.crossover = np.random.random(numPercepts)
+
+        # Chromosome is in format: [three choices for monster, three choices for creature, three choices for food]
+        self.mutate = round(random.random(), 2)
+        self.crossover /= sum(self.crossover)
+        self.chromosome = self.monster + self.creature + self.food
+
+        print(self.chromosome)
 
         # Do not remove this line at the end.  It calls constructors
         # of the parent classes.
         Creature.__init__(self)
-
 
     # This is the implementation of the agent function that is called on every turn, giving your
     # creature a chance to perform an action.  You need to implement a model here, that takes its parameters
@@ -54,6 +83,14 @@ class MyCreature(Creature):
         # replace this with some model that maps percepts to actions.  The model
         # should be parametrised by the chromosome
         actions = np.random.uniform(0, 1, size=numActions)
+
+        # Get the list containing the location of each type around our creature.
+        monsters = [i for i, x in enumerate(percepts[0:9]) if x == 1]
+        creatures = [i for i, x in enumerate(percepts[9:18]) if x == 1]
+        green_food = [i for i, x in enumerate(percepts[18:27]) if x == 1]
+        red_food = [i for i, x in enumerate(percepts[18:27]) if x == 2]
+
+        #actions = [None] * numActions
 
         return actions.tolist()
 
