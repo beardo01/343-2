@@ -37,35 +37,26 @@ class MyCreature(Creature):
         # and set it to some random state.
 
         # Generate the monster part of the chromosome.
-        monster = [None] * int(3)
-        monster_state = [0, 1]
-        for i in range(len(monster)):
-            monster[i] = random.choice(monster_state)
-        self.monster = monster
+        self.monster = [round(random.random(), 2)] + [round(random.random(), 2)]
 
         # Generate the creature part of the chromosome.
-        creature = [None] * int(3)
-        creature_state = [0, 1]
-        for i in range(len(creature)):
-            creature[i] = random.choice(creature_state)
-        self.creature = creature
+        self.creature = [round(random.random(), 2)] + [round(random.random(), 2)]
 
-        # Generate the food part of the chromosome.
-        food = [None] * int(3)
-        food_state = [0, 1, 2]
-        for i in range(len(food)):
-            food[i] = random.choice(food_state)
-        self.food = food
+        # Generate the green food part of the chromosome.
+        self.green_food = [round(random.random(), 2)] + [round(random.random(), 2)]
+
+        # Generate the red food part of the chromosome.
+        self.red_food = [round(random.random(), 2)] + [round(random.random(), 2)]
 
         # Generate cross over intercept probabilities.
-        self.crossover = np.random.random(numPercepts)
+        self.crossover = np.random.random(8)
 
-        # Chromosome is in format: [three choices for monster, three choices for creature, three choices for food]
-        self.mutate = round(random.random(), 2)
+        # Chromosome is in format: [prob of move if {monster, creature, green food, red food}, move prob {monster,
+        # creature, green food, red food}]
+        # If move prob is True, we move away
+        self.mutate = [round(random.random(), 2)]
         self.crossover /= sum(self.crossover)
-        self.chromosome = self.monster + self.creature + self.food
-
-        print(self.chromosome)
+        self.chromosome = self.monster + self.creature + self.green_food + self.red_food
 
         # Do not remove this line at the end.  It calls constructors
         # of the parent classes.
@@ -82,15 +73,15 @@ class MyCreature(Creature):
         # At the moment the actions is a list of random numbers.  You need to
         # replace this with some model that maps percepts to actions.  The model
         # should be parametrised by the chromosome
-        actions = np.random.uniform(0, 1, size=numActions)
+        # actions = np.random.uniform(0, 1, size=numActions)
+        # actions = [None] * numActions
+        actions = self.chromosome
 
         # Get the list containing the location of each type around our creature.
-        monsters = [i for i, x in enumerate(percepts[0:9]) if x == 1]
-        creatures = [i for i, x in enumerate(percepts[9:18]) if x == 1]
-        green_food = [i for i, x in enumerate(percepts[18:27]) if x == 1]
-        red_food = [i for i, x in enumerate(percepts[18:27]) if x == 2]
-
-        #actions = [None] * numActions
+        # monsters = [i for i, x in enumerate(percepts[0:9]) if x == 1]
+        # creatures = [i for i, x in enumerate(percepts[9:18]) if x == 1]
+        # green_food = [i for i, x in enumerate(percepts[18:27]) if x == 1]
+        # red_food = [i for i, x in enumerate(percepts[18:27]) if x == 2]
 
         return actions.tolist()
 
