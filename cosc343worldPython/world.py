@@ -37,26 +37,26 @@ class MyCreature(Creature):
         # and set it to some random state.
 
         # Generate the monster part of the chromosome.
-        self.monster = [round(random.random(), 2)] + [round(random.random(), 2)]
-
-        # Generate the creature part of the chromosome.
-        self.creature = [round(random.random(), 2)] + [round(random.random(), 2)]
-
-        # Generate the green food part of the chromosome.
-        self.green_food = [round(random.random(), 2)] + [round(random.random(), 2)]
-
-        # Generate the red food part of the chromosome.
-        self.red_food = [round(random.random(), 2)] + [round(random.random(), 2)]
+        self.north_west = [round(random.random(), 2)]
+        self.north = [round(random.random(), 2)]
+        self.north_east = [round(random.random(), 2)]
+        self.east = [round(random.random(), 2)]
+        self.south_east = [round(random.random(), 2)]
+        self.south = [round(random.random(), 2)]
+        self.south_west = [round(random.random(), 2)]
+        self.west = [round(random.random(), 2)]
+        self.stay = [round(random.random(), 2)]
+        self.eat = [round(random.random(), 2)]
+        self.random = [round(random.random(), 2)]
 
         # Generate cross over intercept probabilities.
-        self.crossover = np.random.random(8)
+        self.crossover = np.random.random(11)
 
-        # Chromosome is in format: [prob of move if {monster, creature, green food, red food}, move prob {monster,
-        # creature, green food, red food}]
-        # If move prob is True, we move away
+        # Chromosome is in format: [nw, n, ne, e, se, s, sw, w, stay, eat, random]
         self.mutate = [round(random.random(), 2)]
         self.crossover /= sum(self.crossover)
-        self.chromosome = self.monster + self.creature + self.green_food + self.red_food
+        self.chromosome = self.north_west + self.north + self.north_east + self.west + self.stay + self.east + \
+            self.south_west + self.south + self.south_east + self.eat + self.random
 
         # Do not remove this line at the end.  It calls constructors
         # of the parent classes.
@@ -74,16 +74,30 @@ class MyCreature(Creature):
         # replace this with some model that maps percepts to actions.  The model
         # should be parametrised by the chromosome
         # actions = np.random.uniform(0, 1, size=numActions)
-        # actions = [None] * numActions
         actions = self.chromosome
+        # actions = [None] * numActions
 
         # Get the list containing the location of each type around our creature.
-        # monsters = [i for i, x in enumerate(percepts[0:9]) if x == 1]
-        # creatures = [i for i, x in enumerate(percepts[9:18]) if x == 1]
-        # green_food = [i for i, x in enumerate(percepts[18:27]) if x == 1]
-        # red_food = [i for i, x in enumerate(percepts[18:27]) if x == 2]
+        monsters = [i + 1 for i, x in enumerate(percepts[0:9]) if x == 1]
+        creatures = [i + 1 for i, x in enumerate(percepts[9:18]) if x == 1]
+        food = [i + 1 for i, x in enumerate(percepts[18:27]) if x >= 1]
 
-        return actions.tolist()
+        for monster in monsters:
+            actions[monster - 1] -= round(random.random(), 2)
+
+        for creature in creatures:
+            actions[creature - 1] -= round(random.random(), 2)
+
+        for meal in food:
+            if meal == 4:
+                actions[9] += 2000
+            else:
+                actions[meal - 1] += round(random.random(), 2)
+
+        if not monsters and not creatures and not food:
+            actions[10] += round(random.random(), 2)
+
+        return actions#.tolist()
 
 
 # This function is called after every simulation, passing a list of the old population of creatures, whose fitness
