@@ -2,6 +2,7 @@
 from cosc343world import Creature, World
 import numpy as np
 import random
+import operator
 import time
 
 # You can change this number to specify how many generations creatures are going to evolve over...
@@ -12,18 +13,18 @@ numTurns = 100
 
 # You can change this number to change the percept format.  You have three choice - format 1, 2 and 3 (described in
 # the assignment 2 pdf document)
-perceptFormat=1
+perceptFormat = 1
 
-# You can change this number to chnage the world size
-gridSize=24
+# You can change this number to change the world size
+gridSize = 24
 
 # You can set this mode to True to have same initial conditions for each simulation in each generation.  Good
-# for development, when you want to have some determinism in how the world runs from generatin to generation.
-repeatableMode=False
+# for development, when you want to have some determinism in how the world runs from generating to generation.
+repeatableMode = False
 
 # This is a class implementing you creature a.k.a MyCreature.  It extends the basic Creature, which provides the
 # basic functionality of the creature for the world simulation.  Your job is to implement the AgentFunction
-# that controls creature's behavoiur by producing actions in respons to percepts.
+# that controls creature's behaviour by producing actions in response to percepts.
 class MyCreature(Creature):
 
     # Initialisation function.  This is where you creature
@@ -37,26 +38,26 @@ class MyCreature(Creature):
         # and set it to some random state.
 
         # Generate the monster part of the chromosome.
-        self.north_west = [round(random.random(), 2)]
-        self.north = [round(random.random(), 2)]
-        self.north_east = [round(random.random(), 2)]
-        self.east = [round(random.random(), 2)]
-        self.south_east = [round(random.random(), 2)]
-        self.south = [round(random.random(), 2)]
-        self.south_west = [round(random.random(), 2)]
-        self.west = [round(random.random(), 2)]
-        self.stay = [round(random.random(), 2)]
+        self.monster_move_away = [round(random.random(), 2)]
+        self.monster_move_closer = [round(random.random(), 2)]
+        self.creature_move_away = [round(random.random(), 2)]
+        self.creature_move_closer = [round(random.random(), 2)]
+        self.food_move_away = [round(random.random(), 2)]
+        self.food_move_closer = [round(random.random(), 2)]
         self.eat = [round(random.random(), 2)]
         self.random = [round(random.random(), 2)]
 
         # Generate cross over intercept probabilities.
-        self.crossover = np.random.random(11)
-
-        # Chromosome is in format: [nw, n, ne, e, se, s, sw, w, stay, eat, random]
-        self.mutate = [round(random.random(), 2)]
+        self.crossover = np.random.random(7)
         self.crossover /= sum(self.crossover)
-        self.chromosome = self.north_west + self.north + self.north_east + self.west + self.stay + self.east + \
-            self.south_west + self.south + self.south_east + self.eat + self.random
+
+        # Chromosome is in format: [mma, mmc, cma, cmc, fma, fmc, eat, random]
+        self.mutate = round(random.random(), 2) / 3.0
+        self.crossover = self.crossover.tolist()
+        self.chromosome = self.monster_move_away + self.monster_move_closer + self.creature_move_away + \
+            self.creature_move_closer + self.food_move_away + self.food_move_closer + self.eat + self.random
+        self.fitness = 0
+        self.chromosome = [.2, .3, .1, .3, .2, .1, .1, .1]
 
         # Do not remove this line at the end.  It calls constructors
         # of the parent classes.
@@ -74,30 +75,42 @@ class MyCreature(Creature):
         # replace this with some model that maps percepts to actions.  The model
         # should be parametrised by the chromosome
         # actions = np.random.uniform(0, 1, size=numActions)
-        actions = self.chromosome
-        # actions = [None] * numActions
+        actions = [0] * numActions
+        percepts = [1,0,0,0,0,0,0,0,0, 1,0,0,0,0,0,0,0,0, 1,0,0,0,0,0,0,0,0]
 
-        # Get the list containing the location of each type around our creature.
-        monsters = [i + 1 for i, x in enumerate(percepts[0:9]) if x == 1]
-        creatures = [i + 1 for i, x in enumerate(percepts[9:18]) if x == 1]
-        food = [i + 1 for i, x in enumerate(percepts[18:27]) if x >= 1]
+        # Set movement actions
+        for p_index, percept in enumerate(percepts[:9]):
+            if percept:
+                for c_index, chromosome in enumerate(self.chromosome[:2]):
+                    if c_index % 2 == 0:
+                        actions[8 - p_index] += percept * chromosome
+                    else:
+                        actions[p_index] += percept * chromosome
 
-        for monster in monsters:
-            actions[monster - 1] -= round(random.random(), 2)
+        for p_index, percept in enumerate(percepts[9:18]):
+            if percept:
+                for c_index, chromosome in enumerate(self.chromosome[2:4]):
+                    if c_index % 2 == 0:
+                        actions[8 - p_index] += percept * chromosome
+                    else:
+                        actions[p_index] += percept * chromosome
 
-        for creature in creatures:
-            actions[creature - 1] -= round(random.random(), 2)
+        for p_index, percept in enumerate(percepts[18:]):
+            if percept:
+                for c_index, chromosome in enumerate(self.chromosome[4:6]):
+                    if c_index % 2 == 0:
+                        actions[8 - p_index] += percept * chromosome
+                    else:
+                        actions[p_index] += percept * chromosome
 
-        for meal in food:
-            if meal == 4:
-                actions[9] += 2000
-            else:
-                actions[meal - 1] += round(random.random(), 2)
+        # Set food and random actions
+        # actions[9] = sum(percepts[18:])/len(percepts[18:]) # Or should it be the count of things that are non zero?
+        actions[9] += (np.count_nonzero(percepts[18:]) / 9) + self.chromosome[6]
 
-        if not monsters and not creatures and not food:
-            actions[10] += round(random.random(), 2)
-
-        return actions#.tolist()
+        actions[10] = self.chromosome[7]
+        print (actions)
+        exit()
+        return actions
 
 
 # This function is called after every simulation, passing a list of the old population of creatures, whose fitness
@@ -121,7 +134,7 @@ def newPopulation(old_population):
     # For each individual you can extract the following information left over
     # from evaluation to let you figure out how well individual did in the
     # simulation of the world: whether the creature is dead or not, how much
-    # energy did the creature have a the end of simualation (0 if dead), tick number
+    # energy did the creature have a the end of simulation (0 if dead), tick number
     # of creature's death (if dead).  You should use this information to build
     # a fitness function, score for how the individual did
     for individual in old_population:
@@ -136,29 +149,103 @@ def newPopulation(old_population):
         if dead:
             timeOfDeath = individual.timeOfDeath()
             avgLifeTime += timeOfDeath
+
+            individual.fitness += timeOfDeath
+
+            if energy != 0 and energy > timeOfDeath or energy > 50:
+                individual.fitness += 75
         else:
             nSurvivors += 1
             avgLifeTime += numTurns
 
+            individual.fitness += energy
+
+            # Large bonus for surviving
+            individual.fitness += 100
+
+        # Massive bonus if they survive, big bonus based on turns survived if they ate something, regular turns otherwise
+
+        # If they died but their energy isn't zero, and its higher than the number of turns they lasted, or its higher
+        # than initial
+
+        fitnessScore += individual.fitness
+
     # Here are some statistics, which you may or may not find useful
     avgLifeTime = float(avgLifeTime)/float(len(population))
+    fitnessScore = float(fitnessScore)/float(len(population))
     print("Simulation stats:")
     print("  Survivors    : %d out of %d" % (nSurvivors, len(population)))
     print("  Avg life time: %.1f turns" % avgLifeTime)
+    print("  Avg fitness: %.1f" % fitnessScore)
 
     # The information gathered above should allow you to build a fitness function that evaluates fitness of
     # every creature.  You should show the average fitness, but also use the fitness for selecting parents and
     # creating new creatures.
 
-
     # Based on the fitness you should select individuals for reproduction and create a
     # new population.  At the moment this is not done, and the same population with the same number
     # of individuals
-    new_population = old_population
+    def tournamentSelect(n):
+        fittest = {}
+        for individual in n:
+            fittest[individual] = individual.fitness
+
+        sorted_fitness = sorted(fittest.items(), key=lambda x: x[1])
+
+        # print(sorted_fitness[0][0].fitness, sorted_fitness[1][0].fitness, \
+        #   sorted_fitness[len(sorted_fitness) - 2][0].fitness, sorted_fitness[len(sorted_fitness) - 1][0].fitness)
+
+        return [sorted_fitness[len(sorted_fitness) - 1][0], sorted_fitness[len(sorted_fitness) - 2][0]]
+
+    def decision(probability):
+        return random.random() < probability
+
+    new_population = []
+    while len(new_population) < len(old_population):
+        winner, winner2 = tournamentSelect(random.sample(old_population, int(len(old_population) / 5)))
+
+        # print(winner.fitness, winner2.fitness)
+        # print(winner.chromosome, winner2.chromosome)
+
+        average_mutate = (winner.mutate + winner2.mutate) / 2.0
+
+        average_crossover = []
+        for i in range(len(winner.crossover)):
+            average_crossover.append(((winner.crossover[i] + winner2.crossover[i]) / 2.0))
+
+        #Work out crossover
+        for i in range(len(average_crossover)):
+            if i == len(average_crossover) - 1:
+                if decision(average_crossover[i]):
+                    crossover = i
+                    break
+                crossover = random.randint(0, 7)
+                break
+            if decision(average_crossover[i]):
+                crossover = i
+                break
+        #crossover = int(len(winner.chromosome) / 2)
+
+        new_chromosome = winner.chromosome[:crossover] + winner2.chromosome[crossover:len(winner2.chromosome)]
+
+
+        if decision(average_mutate):
+            new_chromosome[random.randint(0, len(new_chromosome) - 1)] = round(random.random(), 2)
+
+        new_individual = MyCreature(numCreaturePercepts, numCreatureActions)
+        new_individual.chromosome = new_chromosome
+        new_individual.crossover = average_crossover
+        new_individual.mutate = average_mutate
+
+        # print(winner.chromosome[6:], winner2.chromosome[6:], "\n", new_chromosome[6:])
+        # print(new_individual.chromosome, new_individual.crossover, new_individual.mutate)
+        new_population.append(new_individual)
+
+    # print(old_population[0].chromosome, new_population[0].chromosome)
 
     return new_population
 
-# Create the world.  Representaiton type choses the type of percept representation (there are three types to chose from);
+# Create the world. Representation type chooses the type of percept representation (there are three types to chose from)
 # gridSize specifies the size of the world, repeatable parameter allows you to run the simulation in exactly same way.
 w = World(representationType=perceptFormat, gridSize=gridSize, repeatable=repeatableMode)
 
@@ -184,7 +271,7 @@ w.setNextGeneration(population)
 w.evaluate(numTurns)
 
 # Show visualisation of initial creature behaviour
-w.show_simulation(titleStr='Initial population', speed='normal')
+w.show_simulation(titleStr='Initial population', speed='fast')
 
 for i in range(numGenerations):
     print("\nGeneration %d:" % (i+1))
@@ -200,6 +287,6 @@ for i in range(numGenerations):
 
     # Show visualisation of final generation
     if i==numGenerations-1:
-        w.show_simulation(titleStr='Final population', speed='normal')
+        w.show_simulation(titleStr='Final population', speed='slow')
 
 
