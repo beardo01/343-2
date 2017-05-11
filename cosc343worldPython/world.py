@@ -6,7 +6,7 @@ import operator
 import time
 
 # You can change this number to specify how many generations creatures are going to evolve over...
-numGenerations = 500
+numGenerations = 250
 
 # You can change this number to specify how many turns in simulation of the world for given generation
 numTurns = 100
@@ -20,7 +20,7 @@ gridSize = 24
 
 # You can set this mode to True to have same initial conditions for each simulation in each generation.  Good
 # for development, when you want to have some determinism in how the world runs from generating to generation.
-repeatableMode = False
+repeatableMode = True
 
 # This is a class implementing you creature a.k.a MyCreature.  It extends the basic Creature, which provides the
 # basic functionality of the creature for the world simulation.  Your job is to implement the AgentFunction
@@ -57,7 +57,7 @@ class MyCreature(Creature):
         self.chromosome = self.monster_move_away + self.monster_move_closer + self.creature_move_away + \
             self.creature_move_closer + self.food_move_away + self.food_move_closer + self.eat + self.random
         self.fitness = 0
-        self.chromosome = [.2, .3, .1, .3, .2, .1, .1, .1]
+        # self.chromosome = [.2, .3, .1, .3, .2, .1, .1, .1]
 
         # Do not remove this line at the end.  It calls constructors
         # of the parent classes.
@@ -74,9 +74,9 @@ class MyCreature(Creature):
         # At the moment the actions is a list of random numbers.  You need to
         # replace this with some model that maps percepts to actions.  The model
         # should be parametrised by the chromosome
-        # actions = np.random.uniform(0, 1, size=numActions)
         actions = [0] * numActions
-        percepts = [1,0,0,0,0,0,0,0,0, 1,0,0,0,0,0,0,0,0, 1,0,0,0,0,0,0,0,0]
+        # percepts = [1,1,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0]
+        # print(percepts)
 
         # Set movement actions
         for p_index, percept in enumerate(percepts[:9]):
@@ -98,18 +98,24 @@ class MyCreature(Creature):
         for p_index, percept in enumerate(percepts[18:]):
             if percept:
                 for c_index, chromosome in enumerate(self.chromosome[4:6]):
-                    if c_index % 2 == 0:
+                    if c_index % 2 != 0:
                         actions[8 - p_index] += percept * chromosome
                     else:
                         actions[p_index] += percept * chromosome
 
         # Set food and random actions
         # actions[9] = sum(percepts[18:])/len(percepts[18:]) # Or should it be the count of things that are non zero?
-        actions[9] += (np.count_nonzero(percepts[18:]) / 9) + self.chromosome[6]
+        # playing with divisor = 9
+        divisor = 9
+        if percepts[22] > 1:
+            actions[9] += 0.5 + self.chromosome[6]
+            if percepts[22] == 2:
+                actions[9] += 0.5
 
-        actions[10] = self.chromosome[7]
-        print (actions)
-        exit()
+        actions[10] += (((len(percepts) - np.count_nonzero(percepts)) / 27)/9) + self.chromosome[7]
+        # print(actions)
+        # print(self.chromosome)
+        # exit()
         return actions
 
 
@@ -152,7 +158,9 @@ def newPopulation(old_population):
 
             individual.fitness += timeOfDeath
 
-            if energy != 0 and energy > timeOfDeath or energy > 50:
+            # If they died but their energy isn't zero, and its higher than the number of turns they lasted, or
+            # its higher than initial
+            if energy > timeOfDeath or energy > 50:
                 individual.fitness += 75
         else:
             nSurvivors += 1
@@ -163,12 +171,9 @@ def newPopulation(old_population):
             # Large bonus for surviving
             individual.fitness += 100
 
-        # Massive bonus if they survive, big bonus based on turns survived if they ate something, regular turns otherwise
-
-        # If they died but their energy isn't zero, and its higher than the number of turns they lasted, or its higher
-        # than initial
-
         fitnessScore += individual.fitness
+
+        # print(individual.chromosome, individual.fitness)
 
     # Here are some statistics, which you may or may not find useful
     avgLifeTime = float(avgLifeTime)/float(len(population))
@@ -202,7 +207,7 @@ def newPopulation(old_population):
 
     new_population = []
     while len(new_population) < len(old_population):
-        winner, winner2 = tournamentSelect(random.sample(old_population, int(len(old_population) / 5)))
+        winner, winner2 = tournamentSelect(random.sample(old_population, int(len(old_population) / 4)))
 
         # print(winner.fitness, winner2.fitness)
         # print(winner.chromosome, winner2.chromosome)
@@ -287,6 +292,15 @@ for i in range(numGenerations):
 
     # Show visualisation of final generation
     if i==numGenerations-1:
+        for pop in population:
+            print ("MMA: " + str(pop.chromosome[0]) + \
+                   " MMC: " + str(pop.chromosome[1]) + \
+                   " CMA: " + str(pop.chromosome[2]) + \
+                   " CMC: " + str(pop.chromosome[3]) + \
+                   " FMA: " + str(pop.chromosome[4]) + \
+                   " FMC: " + str(pop.chromosome[5]) + \
+                   " EAT: " + str(pop.chromosome[6]) + \
+                   " RAN: " + str(pop.chromosome[7]))
         w.show_simulation(titleStr='Final population', speed='slow')
 
 
