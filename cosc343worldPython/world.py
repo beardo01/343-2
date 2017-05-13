@@ -2,8 +2,7 @@
 from cosc343world import Creature, World
 import numpy as np
 import random
-import operator
-import time
+import matplotlib.pyplot as plt
 
 # You can change this number to specify how many generations creatures are going to evolve over...
 numGenerations = 250
@@ -21,6 +20,8 @@ gridSize = 24
 # You can set this mode to True to have same initial conditions for each simulation in each generation.  Good
 # for development, when you want to have some determinism in how the world runs from generating to generation.
 repeatableMode = True
+
+archive = [[] for _ in range(10)]
 
 # This is a class implementing you creature a.k.a MyCreature.  It extends the basic Creature, which provides the
 # basic functionality of the creature for the world simulation.  Your job is to implement the AgentFunction
@@ -49,15 +50,13 @@ class MyCreature(Creature):
 
         # Generate cross over intercept probabilities.
         self.crossover = np.random.random(7)
-        self.crossover /= sum(self.crossover)
 
         # Chromosome is in format: [mma, mmc, cma, cmc, fma, fmc, eat, random]
-        self.mutate = round(random.random(), 2) / 3.0
+        self.mutate = round(random.uniform(0.002, 0.01), 3)
         self.crossover = self.crossover.tolist()
         self.chromosome = self.monster_move_away + self.monster_move_closer + self.creature_move_away + \
             self.creature_move_closer + self.food_move_away + self.food_move_closer + self.eat + self.random
         self.fitness = 0
-        # self.chromosome = [.2, .3, .1, .3, .2, .1, .1, .1]
 
         # Do not remove this line at the end.  It calls constructors
         # of the parent classes.
@@ -75,8 +74,6 @@ class MyCreature(Creature):
         # replace this with some model that maps percepts to actions.  The model
         # should be parametrised by the chromosome
         actions = [0] * numActions
-        # percepts = [1,1,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0]
-        # print(percepts)
 
         # Set movement actions
         for p_index, percept in enumerate(percepts[:9]):
@@ -98,24 +95,23 @@ class MyCreature(Creature):
         for p_index, percept in enumerate(percepts[18:]):
             if percept:
                 for c_index, chromosome in enumerate(self.chromosome[4:6]):
-                    if c_index % 2 != 0:
+                    if c_index % 2 == 0:
                         actions[8 - p_index] += percept * chromosome
                     else:
                         actions[p_index] += percept * chromosome
 
         # Set food and random actions
-        # actions[9] = sum(percepts[18:])/len(percepts[18:]) # Or should it be the count of things that are non zero?
-        # playing with divisor = 9
-        divisor = 9
-        if percepts[22] > 1:
-            actions[9] += 0.5 + self.chromosome[6]
-            if percepts[22] == 2:
-                actions[9] += 0.5
 
-        actions[10] += (((len(percepts) - np.count_nonzero(percepts)) / 27)/9) + self.chromosome[7]
-        # print(actions)
-        # print(self.chromosome)
-        # exit()
+        # if percepts[22] > 1:
+        #     actions[9] += self.chromosome[6]
+        #     if percepts[22] == 2:
+        #         actions[9] += self.chromosome[6] * 2
+
+        if percepts[22]:
+            actions[9] += self.chromosome[6] * percepts[22]
+
+        actions[10] += ((1 - (np.count_nonzero(percepts) / 27)) / 3) + self.chromosome[7]
+
         return actions
 
 
@@ -132,6 +128,7 @@ class MyCreature(Creature):
 # Returns: a list of MyCreature objects of the same length as the old_population.
 def newPopulation(old_population):
     global numTurns
+    global archive
 
     nSurvivors = 0
     avgLifeTime = 0
@@ -143,6 +140,28 @@ def newPopulation(old_population):
     # energy did the creature have a the end of simulation (0 if dead), tick number
     # of creature's death (if dead).  You should use this information to build
     # a fitness function, score for how the individual did
+    def fitness(individual):
+        dead = individual.isDead()
+        tod = individual.timeOfDeath()
+        energy = individual.getEnergy()
+
+        # Give each chromosome base line of TOD
+        fitness = tod
+
+        # Chromosomes that move away from monsters
+        if not dead:
+            fitness += 100
+
+        # Chromosomes that eat
+        if energy > (50 - tod):
+            fitness += energy - (50 - tod)
+
+        # Chromosomes that move closer to food
+        if tod > 50:
+            fitness += tod - 50
+
+        return fitness
+
     for individual in old_population:
 
         # You can read the creature's energy at the end of the simulation.  It will be 0 if creature is dead
@@ -155,29 +174,18 @@ def newPopulation(old_population):
         if dead:
             timeOfDeath = individual.timeOfDeath()
             avgLifeTime += timeOfDeath
-
-            individual.fitness += timeOfDeath
-
-            # If they died but their energy isn't zero, and its higher than the number of turns they lasted, or
-            # its higher than initial
-            if energy > timeOfDeath or energy > 50:
-                individual.fitness += 75
         else:
             nSurvivors += 1
             avgLifeTime += numTurns
 
-            individual.fitness += energy
-
-            # Large bonus for surviving
-            individual.fitness += 100
-
+        individual.fitness = fitness(individual)
         fitnessScore += individual.fitness
-
-        # print(individual.chromosome, individual.fitness)
 
     # Here are some statistics, which you may or may not find useful
     avgLifeTime = float(avgLifeTime)/float(len(population))
     fitnessScore = float(fitnessScore)/float(len(population))
+    archive[8].append(nSurvivors)
+    archive[9].append(fitnessScore)
     print("Simulation stats:")
     print("  Survivors    : %d out of %d" % (nSurvivors, len(population)))
     print("  Avg life time: %.1f turns" % avgLifeTime)
@@ -190,63 +198,102 @@ def newPopulation(old_population):
     # Based on the fitness you should select individuals for reproduction and create a
     # new population.  At the moment this is not done, and the same population with the same number
     # of individuals
-    def tournamentSelect(n):
-        fittest = {}
-        for individual in n:
-            fittest[individual] = individual.fitness
+    def elitism(old_population, n):
+        sorted_fitness = sorted(old_population, key=lambda individual: individual.fitness)
 
-        sorted_fitness = sorted(fittest.items(), key=lambda x: x[1])
+        elite = []
+        for e in sorted_fitness[len(sorted_fitness) - n:]:
+            elite_individual = MyCreature(numCreaturePercepts, numCreatureActions)
+            elite_individual.chromosome = e.chromosome
+            elite_individual.crossover = e.crossover
+            elite_individual.mutate = e.mutate
+            elite.append(elite_individual)
 
-        # print(sorted_fitness[0][0].fitness, sorted_fitness[1][0].fitness, \
-        #   sorted_fitness[len(sorted_fitness) - 2][0].fitness, sorted_fitness[len(sorted_fitness) - 1][0].fitness)
+        return elite
 
-        return [sorted_fitness[len(sorted_fitness) - 1][0], sorted_fitness[len(sorted_fitness) - 2][0]]
+    def tournament_select(n):
+        sorted_fitness = sorted(n, key=lambda individual: individual.fitness)
+        return [sorted_fitness[-1], sorted_fitness[-2]]
 
-    def decision(probability):
-        return random.random() < probability
-
-    new_population = []
-    while len(new_population) < len(old_population):
-        winner, winner2 = tournamentSelect(random.sample(old_population, int(len(old_population) / 4)))
-
-        # print(winner.fitness, winner2.fitness)
-        # print(winner.chromosome, winner2.chromosome)
-
-        average_mutate = (winner.mutate + winner2.mutate) / 2.0
-
+    def crossover(parent1, parent2):
+        # Calculate the average crossover of the two parents
         average_crossover = []
-        for i in range(len(winner.crossover)):
-            average_crossover.append(((winner.crossover[i] + winner2.crossover[i]) / 2.0))
+        for i in range(len(parent1.crossover)):
+            average_crossover.append(((parent1.crossover[i] + parent2.crossover[i]) / 2.0))
 
-        #Work out crossover
-        for i in range(len(average_crossover)):
-            if i == len(average_crossover) - 1:
-                if decision(average_crossover[i]):
-                    crossover = i
-                    break
-                crossover = random.randint(0, 7)
-                break
-            if decision(average_crossover[i]):
+        # Select crossover
+        i = random.randint(0, len(average_crossover) - 1)
+        crossover = 0
+        while i != len(average_crossover):
+            # Loop back to start of array
+            if i == len(average_crossover):
+                i = 0
+
+            # Check if random value is valid
+            if random.random() < average_crossover[i]:
                 crossover = i
                 break
-        #crossover = int(len(winner.chromosome) / 2)
+            else:
+                i += 1
+        crossover = int(len(average_crossover) / 2)
 
-        new_chromosome = winner.chromosome[:crossover] + winner2.chromosome[crossover:len(winner2.chromosome)]
+        return [parent1.chromosome[:crossover] + parent2.chromosome[crossover:len(parent2.chromosome)],
+                average_crossover]
 
+    def mutate(chromosome, parent1, parent2):
+        average_mutate = (parent1.mutate + parent2.mutate) / 2.0
+        rand = random.random()
+        if rand < average_mutate:
+            i = random.randint(0, len(chromosome) - 1)
+            mutate = round(random.random(), 2)
+            print("MUTATION BOYS!: " + str(chromosome[i]) + " > " + str(mutate) + " as " + str(rand) + " < " + str(average_mutate))
+            chromosome[i] = mutate
 
-        if decision(average_mutate):
-            new_chromosome[random.randint(0, len(new_chromosome) - 1)] = round(random.random(), 2)
+        return [chromosome, average_mutate]
 
+    # Perform elitism
+    new_population = elitism(old_population, 5)
+    sums = [0, 0, 0, 0, 0, 0, 0, 0]
+    while len(new_population) < len(old_population):
+
+        # Select new parents via tournament selection
+        winner1, winner2 = tournament_select(random.sample(old_population, int(len(old_population) / 2)))
+
+        # Crossover parents
+        child_chromosome, child_crossover = crossover(winner1, winner2)
+
+        # Mutate child chromosome
+        child_chromosome, child_mutation = mutate(child_chromosome, winner1, winner2)
+
+        # Create new child
         new_individual = MyCreature(numCreaturePercepts, numCreatureActions)
-        new_individual.chromosome = new_chromosome
-        new_individual.crossover = average_crossover
-        new_individual.mutate = average_mutate
+        new_individual.chromosome = child_chromosome
+        new_individual.crossover = child_crossover
+        new_individual.mutate = child_mutation
 
-        # print(winner.chromosome[6:], winner2.chromosome[6:], "\n", new_chromosome[6:])
-        # print(new_individual.chromosome, new_individual.crossover, new_individual.mutate)
+        # Add new child to new population
         new_population.append(new_individual)
 
-    # print(old_population[0].chromosome, new_population[0].chromosome)
+        for index, val in enumerate(new_individual.chromosome):
+            sums[index] += val
+
+    averages = [0] * 8
+    for index, val in enumerate(sums):
+        averages[index] = round(val/len(new_population), 2)
+
+    for index, val in enumerate(averages):
+        archive[index].append(val)
+
+    print(archive)
+
+    print("MMA:\t" + str(averages[0]) + "\n" +
+          "MMC:\t" + str(averages[1]) + "\n" +
+          "CMA:\t" + str(averages[2]) + "\n" +
+          "CMC:\t" + str(averages[3]) + "\n" +
+          "FMA:\t" + str(averages[4]) + "\n" +
+          "FMC:\t" + str(averages[5]) + "\n" +
+          "EAT:\t" + str(averages[6]) + "\n" +
+          "RAN:\t" + str(averages[7]))
 
     return new_population
 
@@ -276,7 +323,7 @@ w.setNextGeneration(population)
 w.evaluate(numTurns)
 
 # Show visualisation of initial creature behaviour
-w.show_simulation(titleStr='Initial population', speed='fast')
+#w.show_simulation(titleStr='Initial population', speed='fast')
 
 for i in range(numGenerations):
     print("\nGeneration %d:" % (i+1))
@@ -291,16 +338,18 @@ for i in range(numGenerations):
     w.evaluate(numTurns)
 
     # Show visualisation of final generation
-    if i==numGenerations-1:
-        for pop in population:
-            print ("MMA: " + str(pop.chromosome[0]) + \
-                   " MMC: " + str(pop.chromosome[1]) + \
-                   " CMA: " + str(pop.chromosome[2]) + \
-                   " CMC: " + str(pop.chromosome[3]) + \
-                   " FMA: " + str(pop.chromosome[4]) + \
-                   " FMC: " + str(pop.chromosome[5]) + \
-                   " EAT: " + str(pop.chromosome[6]) + \
-                   " RAN: " + str(pop.chromosome[7]))
-        w.show_simulation(titleStr='Final population', speed='slow')
+    #if i==numGenerations-1:
+        #w.show_simulation(titleStr='Final population', speed='slow')
 
-
+plt.plot(archive[0], color='blue', label="MMA")
+plt.plot(archive[1], color='green', label="MMC")
+plt.plot(archive[9], color='red', label="FIT")
+# plt.plot(archive[2], 'b--')
+# plt.plot(archive[3], 'b')
+# plt.plot(archive[4], 'g--')
+# plt.plot(archive[5], 'g')
+# plt.plot(archive[6])
+# plt.plot(archive[7])
+plt.ylabel('Chromosome value averages')
+plt.legend(loc='upper left')
+plt.show()
