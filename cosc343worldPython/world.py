@@ -5,7 +5,7 @@ import random
 import matplotlib.pyplot as plt
 
 # You can change this number to specify how many generations creatures are going to evolve over...
-numGenerations = 250
+numGenerations = 500
 
 # You can change this number to specify how many turns in simulation of the world for given generation
 numTurns = 100
@@ -108,9 +108,10 @@ class MyCreature(Creature):
         #         actions[9] += self.chromosome[6] * 2
 
         if percepts[22]:
-            actions[9] += self.chromosome[6] * percepts[22]
+            actions[9] += percepts[22] * self.chromosome[6]
 
         actions[10] += ((1 - (np.count_nonzero(percepts) / 27)) / 3) + self.chromosome[7]
+        #actions[10] += ((len(percepts) - np.count_nonzero(percepts)) / 27) / 4
 
         return actions
 
@@ -145,20 +146,25 @@ def newPopulation(old_population):
         tod = individual.timeOfDeath()
         energy = individual.getEnergy()
 
-        # Give each chromosome base line of TOD
-        fitness = tod
+        # Give each chromosome base line
+        # if not dead:
+        #     fitness = 50
+        # else:
+        #     fitness = tod
+        fitness = 0
 
         # Chromosomes that move away from monsters
         if not dead:
-            fitness += 100
+            fitness += 50 + energy
 
         # Chromosomes that eat
+        # Want to check if its dead before doing this!
         if energy > (50 - tod):
-            fitness += energy - (50 - tod)
+            fitness += (energy - (50 - tod)) * 5
 
         # Chromosomes that move closer to food
         if tod > 50:
-            fitness += tod - 50
+            fitness += (tod - 50) * 5
 
         return fitness
 
@@ -338,8 +344,8 @@ for i in range(numGenerations):
     w.evaluate(numTurns)
 
     # Show visualisation of final generation
-    #if i==numGenerations-1:
-        #w.show_simulation(titleStr='Final population', speed='slow')
+    if i==numGenerations-1:
+        w.show_simulation(titleStr='Final population', speed='slow')
 
 plt.plot(archive[0], color='blue', label="MMA")
 plt.plot(archive[1], color='green', label="MMC")
