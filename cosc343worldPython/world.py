@@ -4,9 +4,10 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 import statistics
+import math
 
 # You can change this number to specify how many generations creatures are going to evolve over...
-numGenerations = 500
+numGenerations = 300
 
 # You can change this number to specify how many turns in simulation of the world for given generation
 numTurns = 100
@@ -24,7 +25,7 @@ gridSize = 40
 # for development, when you want to have some determinism in how the world runs from generating to generation.
 repeatableMode = False
 
-archive = [[] for _ in range(11)]
+archive = [[] for _ in range(12)]
 
 # This is a class implementing you creature a.k.a MyCreature.  It extends the basic Creature, which provides the
 # basic functionality of the creature for the world simulation.  Your job is to implement the AgentFunction
@@ -44,6 +45,7 @@ class MyCreature(Creature):
         # Generate the monster part of the chromosome.
         self.monster_move_away = [round(random.random(), 2)]
         self.monster_move_closer = [round(random.random(), 2)]
+        self.monster_move_diag = [round(random.random(), 2)]
         self.creature_move_away = [round(random.random(), 2)]
         self.creature_move_closer = [round(random.random(), 2)]
         self.food_move_away = [round(random.random(), 2)]
@@ -52,13 +54,14 @@ class MyCreature(Creature):
         self.random = [round(random.random(), 2)]
 
         # Generate cross over intercept probabilities.
-        self.crossover = np.random.random(7)
+        self.crossover = np.random.random(8)
 
         # Chromosome is in format: [mma, mmc, cma, cmc, fma, fmc, eat, random]
         self.mutate = round(random.uniform(0.002, 0.01), 3)
         self.crossover = self.crossover.tolist()
-        self.chromosome = self.monster_move_away + self.monster_move_closer + self.creature_move_away + \
-            self.creature_move_closer + self.food_move_away + self.food_move_closer + self.eat + self.random
+        self.chromosome = self.monster_move_away + self.monster_move_closer + self.monster_move_diag + \
+                          self.creature_move_away + self.creature_move_closer + self.food_move_away + \
+                          self.food_move_closer + self.eat + self.random
         self.fitness = 0
 
         # Do not remove this line at the end.  It calls constructors
@@ -80,54 +83,43 @@ class MyCreature(Creature):
 
         # Set movement actions
         for p_index, percept in enumerate(percepts[:9]):
-            # if percept and percepts[p_index - 8]:
-            #     if p_index % 2 == 0:
-            #         actions[(8 - p_index) + 6] += percept * self.chromosome[0]
-            #         actions[p_index - 6] += percept * self.chromosome[1]
-            #     else:
-            #
-            # else:
-            if percept:
+            if percept and percepts[8 - p_index]:
+                if p_index in [0, 1, 5, 6]:
+                    lower = p_index + 2
+                    upper = (8 - p_index) - 2
+                elif p_index in [2, 3, 7, 8]:
+                    lower = p_index - 2
+                    upper = (8 - p_index) + 2
+
+                if percepts[lower]:
+                    actions[upper] += percept * self.chromosome[2]
+                elif percepts[upper]:
+                    actions[lower] += percept * self.chromosome[2]
+                else:
+                    actions[lower] += percept * self.chromosome[2]
+                    actions[upper] += percept * self.chromosome[2]
+            else:
                 actions[8 - p_index] += percept * self.chromosome[0]
                 actions[p_index] += percept * self.chromosome[1]
 
         for p_index, percept in enumerate(percepts[9:18]):
             if percept:
-                actions[8 - p_index] += percept * self.chromosome[2]
-                actions[p_index] += percept * self.chromosome[3]
+                actions[8 - p_index] += percept * self.chromosome[3]
+                actions[p_index] += percept * self.chromosome[4]
 
         for p_index, percept in enumerate(percepts[18:]):
             if percept:
-                actions[8 - p_index] += percept * self.chromosome[4]
-                actions[p_index] += percept * self.chromosome[5]
+                actions[8 - p_index] += percept * self.chromosome[5]
+                actions[p_index] += percept * self.chromosome[6]
 
         # Set food and random actions
-        if percepts[22] == 2:
-            actions[9] += self.chromosome[6] #* percepts[22]
+        # if percepts[22] == 2:
+        #     actions[9] += self.chromosome[7] #* percepts[22]
+        if percepts[22]:
+            actions[9] += self.chromosome[7] * percepts[22]
 
-        actions[10] += ((1 - (np.count_nonzero(percepts) / 27)) / 3) + self.chromosome[7]
+        actions[10] += ((1 - (np.count_nonzero(percepts) / 27)) / 3) + self.chromosome[8]
         # actions[10] += ((len(percepts) - np.count_nonzero(percepts)) / 27) / 4 + self.chromosome[7]
-
-        # DO OTHER IF WE GOT EITHER SIDE
-        # acts = list(range(len(actions[0:9])))
-        # a = 0
-        # while acts and a < 4:
-        #     if actions[a] > 0 and actions[a] == actions[8-a] and a != 4:
-        #         if a % 2 == 0:
-        #             actions[a + 6] += actions[a]
-        #             actions[a] = 0
-        #             actions[(8 - a) - 6] += actions[8-a]
-        #             actions[8-a] = 0
-        #             acts.pop(8-a)
-        #         else:
-        #             actions[a + 4] += actions[a]
-        #             actions[a] = 0
-        #             actions[(8 - a) - 4] += actions[8 - a]
-        #             actions[8 - a] = 0
-        #             acts.pop(8-a)
-        #     a += 1
-
-
 
         return actions
 
@@ -204,8 +196,8 @@ def newPopulation(old_population):
     # Here are some statistics, which you may or may not find useful
     avgLifeTime = float(avgLifeTime)/float(len(population))
     fitnessScore = float(fitnessScore)/float(len(population))
-    archive[8].append(nSurvivors)
-    archive[9].append(fitnessScore)
+    archive[9].append(nSurvivors)
+    archive[10].append(fitnessScore)
     #print("Simulation stats:")
     print("  Survivors    : %d out of %d (%d percent)" % (nSurvivors, len(population), float(nSurvivors)/len(population) * 100))
     #print("  Avg life time: %.1f turns" % avgLifeTime)
@@ -275,8 +267,8 @@ def newPopulation(old_population):
         global incest
         if parent1.chromosome == parent2.chromosome:
             incest += 1
-            if id % 7 == 0:
-                parent2.chromosome = np.random.random(8).tolist()
+            if id % 5 == 0:
+                parent2.chromosome = np.random.random(9).tolist()
                 #print("diff: " + str(parent1.chromosome), str(parent2.chromosome))
                 #print(parent1, parent2)
 
@@ -315,7 +307,7 @@ def newPopulation(old_population):
                 else:
                     new_chromosome += (parent2.chromosome[crossovers[index - 1]: crossover])
 
-        return [new_chromosome, average_crossover]
+        return [new_chromosome, np.random.random(8)]
 
     def mutate(chromosome, parent1, parent2):
         average_mutate = (parent1.mutate + parent2.mutate) / 2.0
@@ -323,7 +315,6 @@ def newPopulation(old_population):
         if rand < average_mutate:
             i = random.randint(0, len(chromosome) - 1)
             mutate = round(random.random(), 2)
-            #print("MUTATION BOYS!: " + str(chromosome[i]) + " > " + str(mutate) + " as " + str(rand) + " < " + str(average_mutate))
             chromosome[i] = mutate
 
         return [chromosome, average_mutate]
@@ -334,13 +325,12 @@ def newPopulation(old_population):
         if rand < chance:
             i = random.randint(0, len(chromosome) - 1)
             mutate = round(random.random(), 2)
-            #print("MUTATION BOYS!: " + str(chromosome[i]) + " > " + str(mutate) + " as " + str(rand) + " < " + str(chance))
             chromosome[i] = mutate
 
         return chromosome
 
     def standard_deviation(population):
-        chromosomes = [[] for _ in range(8)]
+        chromosomes = [[] for _ in range(9)]
 
         for individual in population:
             for index, val in enumerate(individual.chromosome):
@@ -351,7 +341,7 @@ def newPopulation(old_population):
             standard_devs.append(statistics.stdev(c))
 
         for std_dev in standard_devs:
-            if std_dev < 0.01:
+            if std_dev < 0.005:
                 return True
 
         return False
@@ -361,9 +351,9 @@ def newPopulation(old_population):
         for individual in pop:
             fitness_scores.append(individual.fitness)
 
-        if statistics.stdev(fitness_scores) < 0.3:
-            for individual in random.sample(old_population, int(len(pop)/5)):
-                individual.chromosome = np.random.random(8).tolist()
+        if statistics.stdev(fitness_scores) < 0.2:
+            for individual in random.sample(old_population, int(len(pop)/6)):
+                individual.chromosome = np.random.random(9).tolist()
 
         return pop
 
@@ -372,18 +362,18 @@ def newPopulation(old_population):
 
     # Perform elitism
     new_population = elitism(old_population, 5)
-    sums = [0] * 8
-    chance = 10
+    sums = [0] * 9
+    chance = 5
     incest = 0
     while len(new_population) < len(old_population):
 
 
         # Select new parents via tournament selection
-        winner1 = tournament_select(random.sample(old_population, int(len(old_population) / 8)))
-        winner2 = tournament_select(random.sample(old_population, int(len(old_population) / 8)))
+        winner1 = tournament_select(random.sample(old_population, int(len(old_population) / 5)))
+        winner2 = tournament_select(random.sample(old_population, int(len(old_population) / 5)))
 
         while winner1 == winner2:
-            winner2 = tournament_select(random.sample(old_population, int(len(old_population) / 8)))
+            winner2 = tournament_select(random.sample(old_population, int(len(old_population) / 5)))
 
         # Crossover parents
         # child_chromosome, child_crossover = crossover(winner1, winner2)
@@ -395,8 +385,8 @@ def newPopulation(old_population):
         if len(new_population) % 6 == 0 and len(new_population) != 0:
             # Check SD
             if standard_deviation(new_population):
-                chance += 1
-                #print(chance)
+                chance += 2
+                print(chance)
         child_chromosome = mutate_chance(child_chromosome, chance)
 
         # Create new child
@@ -411,7 +401,7 @@ def newPopulation(old_population):
         for index, val in enumerate(new_individual.chromosome):
             sums[index] += val
 
-    averages = [0] * 8
+    averages = [0] * 9
     for index, val in enumerate(sums):
         averages[index] = round(val/len(new_population), 2)
 
@@ -422,17 +412,18 @@ def newPopulation(old_population):
 
     print("MMA:\t" + str(averages[0]) + "\n" +
           "MMC:\t" + str(averages[1]) + "\n" +
-          "CMA:\t" + str(averages[2]) + "\n" +
-          "CMC:\t" + str(averages[3]) + "\n" +
-          "FMA:\t" + str(averages[4]) + "\n" +
-          "FMC:\t" + str(averages[5]) + "\n" +
-          "EAT:\t" + str(averages[6]) + "\n" +
-          "RAN:\t" + str(averages[7]))
+          "MMD:\t" + str(averages[2]) + "\n" +
+          "CMA:\t" + str(averages[3]) + "\n" +
+          "CMC:\t" + str(averages[4]) + "\n" +
+          "FMA:\t" + str(averages[5]) + "\n" +
+          "FMC:\t" + str(averages[6]) + "\n" +
+          "EAT:\t" + str(averages[7]) + "\n" +
+          "RAN:\t" + str(averages[8]))
     #
     # for i in new_population[-5:]:
     #     print(i.chromosome)
 
-    archive[10].append(incest)
+    archive[11].append(incest)
     return new_population
 
 # Create the world. Representation type chooses the type of percept representation (there are three types to chose from)
@@ -487,10 +478,10 @@ for i in range(numGenerations):
 # plt.plot(archive[5], color='green', label="FMC")
 # plt.plot(archive[6], color='blue', label="EAT")
 # plt.plot(archive[7], color='green', label="RAND")
-plt.plot(archive[8], color='green', label="Survivors")
-plt.plot(archive[9], color='red', label="Fitness")
-plt.plot(archive[10], color='blue', label="Incest")
-plt.ylabel('Average incest')
-plt.title('Average incest before adding incest prevention (' + str(nSurvivors) + ' survivors - ' + str(int(float(nSurvivors)/len(population) * 100)) + ' percent)')
+plt.plot(archive[9], color='green', label="Survivors")
+plt.plot(archive[10], color='red', label="Fitness")
+plt.plot(archive[11], color='blue', label="Incest")
+plt.ylabel('Generational average')
+plt.title(str(nSurvivors) + ' survivors - ' + str(int(float(nSurvivors)/len(population) * 100)) + ' percent\nOn average ' + str(int(np.mean(archive[9]))) + ' creatures survived')
 plt.legend(loc='upper left')
 plt.show()
